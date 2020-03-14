@@ -1,6 +1,6 @@
 from alpine:latest
 env commit 3183297
-run apk update && apk upgrade && \
+run apk update && \
  apk add --virtual build-dependencies cmake curl git jq make && \
  apk add boost-dev g++ gcc gd-dev libid3tag-dev libmad-dev libsndfile-dev && \
  git clone -n https://github.com/bbc/audiowaveform.git && \
@@ -16,6 +16,7 @@ run apk update && apk upgrade && \
  make -j $(nproc) && \
  make install && \
  apk del build-dependencies && \
- rm -rf /var/cache/apk/*
+ rm -rf /var/cache/apk/* && \
+ rm -rf /audiowaveform
 entrypoint ["audiowaveform"]
 cmd ["--help"]
