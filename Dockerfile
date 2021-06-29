@@ -6,8 +6,8 @@ run apk update && \
  git clone -n https://github.com/bbc/audiowaveform.git && \
  cd audiowaveform && \
  git checkout ${commit} && \
- curl -fL# $(curl -s "https://api.github.com/repos/google/googletest/releases/latest" | jq -r .tarball_url) -o googletest.tar.gz && \
- tar -xf googletest.tar.gz && \
+ curl -fL#O https://github.com/google/googletest/archive/release-1.10.0.tar.gz && \
+ tar xzf release-1.10.0.tar.gz && \
  ln -s google*/google* . && \
  mkdir build && \
  cd build && \
