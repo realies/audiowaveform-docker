@@ -1,5 +1,5 @@
 from alpine:latest
-env commit 3111088
+env commit 7c38d99
 run apk update && \
  apk add --virtual build-dependencies cmake curl git jq make && \
  apk add boost-dev g++ gcc gd-dev libid3tag-dev libmad-dev libsndfile-dev && \
