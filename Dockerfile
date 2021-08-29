@@ -7,8 +7,8 @@ run apk update && \
  cd audiowaveform && \
  git checkout ${commit} && \
  curl -fL# $(curl -s "https://api.github.com/repos/google/googletest/releases/latest" | jq -r .tarball_url) -o googletest.tar.gz && \
- tar -xf googletest.tar.gz && \
- ln -s google*/google* . && \
+ mkdir googletest && \
+ tar -xf googletest.tar.gz -C googletest --strip-components=1 && \
  mkdir build && \
  cd build && \
  cmake .. && \
