@@ -1,5 +1,5 @@
 FROM alpine:latest as builder
-ENV COMMIT abc7c99
+ENV COMMIT cb1a978
 RUN apk add --no-cache boost-dev boost-static cmake curl g++ gcc gd-dev git \
     jq libid3tag-dev libmad-dev libpng-static libsndfile-dev libvorbis-static make zlib-static
 RUN apk add --no-cache autoconf automake libtool gettext && \
