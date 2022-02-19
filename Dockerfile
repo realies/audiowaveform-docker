@@ -19,7 +19,7 @@ RUN git clone -n https://github.com/bbc/audiowaveform.git && \
     tar -xf googletest.tar.gz -C googletest --strip-components=1 && \
     mkdir build && \
     cd build && \
-    cmake -D ENABLE_TESTS=1 -D BUILD_STATIC=1 .. && \
+    cmake -D ENABLE_TESTS=0 -D BUILD_STATIC=1 .. && \
     make -j $(nproc) && \
     # /audiowaveform/build/audiowaveform_tests && \
     make install && \
