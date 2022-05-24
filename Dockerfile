@@ -1,4 +1,4 @@
-FROM alpine:latest as builder
+FROM alpine:3.14 as builder
 ENV COMMIT df95124
 RUN apk add --no-cache boost-dev boost-static cmake curl g++ gcc gd-dev git \
     jq libid3tag-dev libmad-dev libpng-static libsndfile-dev libvorbis-static make zlib-static
