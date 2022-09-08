@@ -91,7 +91,7 @@ RUN apk add --no-cache boost-dev boost-static cmake g++ gcc gd-dev git libgd lib
 	git clone https://github.com/google/googletest && \
 	mkdir build && \
 	cd build && \
-	cmake -D ENABLE_TESTS=1 -D BUILD_STATIC=1 .. && \
+	cmake -DCMAKE_CXX_STANDARD=14 -D ENABLE_TESTS=1 -D BUILD_STATIC=1 .. && \
 	make -j $(nproc) && \
 	/audiowaveform/build/audiowaveform_tests || true && \
 	make install && \
