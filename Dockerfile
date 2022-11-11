@@ -42,7 +42,7 @@ RUN apk add --no-cache cmake g++ gcc git samurai && \
 		-DCMAKE_BUILD_TYPE=Release \
 		$CMAKE_CROSSOPTS && \
 	cmake --build build -j $(nproc) && \
-	cmake --build build --target test -j $(nproc) && \
+	ctest -j $(nproc) && \
 	cmake --install build
 RUN apk add --no-cache autoconf automake libtool g++ gcc gettext git !libiconv make pkgconfig && \
 	git clone https://github.com/xiph/flac && \
