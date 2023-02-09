@@ -71,7 +71,7 @@ RUN apk add --no-cache alsa-lib-dev cmake git flac-dev libvorbis-dev linux-heade
 	cd .. && \
 	cmake --install build
 RUN apk add --no-cache cmake g++ gcc git samurai zlib-dev && \
-	git clone https://github.com/tenacityteam/libid3tag && \
+	git clone https://codeberg.org/tenacityteam/libid3tag && \
 	cd libid3tag && \
 	cmake -B build -G Ninja \
 		-DBUILD_SHARED_LIBS=OFF \
