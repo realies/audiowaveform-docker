@@ -1,45 +1,103 @@
-name: CI to Docker Hub
+name: Update Audiowaveform Docker Image
 
 on:
-  push:
-    branches: [master]
+  schedule:
+    - cron: '0 0 * * *' # Daily at 00:00 UTC
+  workflow_dispatch:
 
 jobs:
-  build:
+  check-and-update:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-      - name: Set up QEMU
-        id: qemu
-        uses: docker/setup-qemu-action@v1
-      - name: Available platforms
-        run: echo ${{ steps.qemu.outputs.platforms }}
-      - name: Set up Docker Buildx
-        id: buildx
-        uses: docker/setup-buildx-action@v1
-      - name: Cache Docker layers
-        uses: actions/cache@v2
+      - name: Checkout audiowaveform-docker repository
+        uses: actions/checkout@v4
         with:
-          path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-buildx-
-      - uses: docker/login-action@v1
+          repository: 'realies/audiowaveform-docker'
+          path: 'audiowaveform-docker'
+
+      - name: Get latest commit and check for tag from audiowaveform
+        id: latest_commit_and_tag
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const commitResult = await github.rest.repos.getBranch({
+              owner: 'bbc',
+              repo: 'audiowaveform',
+              branch: 'master',
+            });
+            const commit = commitResult.data.commit.sha.substring(0, 7);
+            console.log(`latest commit SHA: ${commit}`);
+            core.setOutput('commit', commit);
+            
+            const tagsResult = await github.rest.repos.listTags({
+              owner: 'bbc',
+              repo: 'audiowaveform',
+            });
+            const tag = tagsResult.data.find(t => t.commit.sha.startsWith(commit))?.name || '';
+            console.log(`tag associated with the latest commit: ${tag}`);
+            core.setOutput('tag', tag);
+
+      - name: Read current commit in Dockerfile
+        id: current_commit
+        working-directory: ./audiowaveform-docker
+        run: |
+          COMMIT=$(grep -oP '(?<=ENV COMMIT )\S+' Dockerfile)
+          echo "current COMMIT in Dockerfile: $COMMIT"
+          echo "commit=$COMMIT" >> $GITHUB_OUTPUT
+
+      - name: Update Dockerfile if needed
+        if: steps.current_commit.outputs.commit != steps.latest_commit_and_tag.outputs.commit
+        working-directory: ./audiowaveform-docker
+        run: |
+          echo "updating ENV COMMIT in Dockerfile from ${CURRENT_COMMIT} to ${LATEST_COMMIT}"
+          sed -i "s/^ENV COMMIT ${CURRENT_COMMIT}/ENV COMMIT ${LATEST_COMMIT}/" Dockerfile
+        env:
+          CURRENT_COMMIT: ${{ steps.current_commit.outputs.commit }}
+          LATEST_COMMIT: ${{ steps.latest_commit_and_tag.outputs.commit }}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Build and push
-        id: docker_build
-        uses: docker/build-push-action@v2
+
+      - name: Prepare Docker Tags
+        id: prepare_tags
+        working-directory: ./audiowaveform-docker
+        run: |
+          if [[ ! -z "$TAG_NAME" ]]; then
+            echo "tags=realies/audiowaveform:$TAG_NAME,realies/audiowaveform:latest" >> $GITHUB_OUTPUT
+          else
+            echo "tags=realies/audiowaveform:latest" >> $GITHUB_OUTPUT
+          fi
+        env:
+          TAG_NAME: ${{ steps.latest_commit_and_tag.outputs.tag }}
+
+      - name: Build and push Docker image
+        if: steps.current_commit.outputs.commit != steps.latest_commit_and_tag.outputs.commit
+        uses: docker/build-push-action@v5
         with:
-          context: ./
-          file: ./Dockerfile
-          builder: ${{ steps.buildx.outputs.name }}
+          context: ./audiowaveform-docker
+          file: ./audiowaveform-docker/Dockerfile
           push: true
-          tags: realies/audiowaveform:latest
+          tags: ${{ steps.prepare_tags.outputs.tags }}
           platforms: linux/386,linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64/v8,linux/ppc64le,linux/s390x
-          cache-from: type=local,src=/tmp/.buildx-cache
-          cache-to: type=local,dest=/tmp/.buildx-cache
-      - name: Image digest
-        run: echo ${{ steps.docker_build.outputs.digest }}
+          # Ensure Buildx is used with cache
+          cache-from: type=registry,ref=realies/audiowaveform:cache
+          cache-to: type=inline,mode=max,ref=realies/audiowaveform:cache
+
+      - name: Commit Dockerfile if needed
+        if: steps.current_commit.outputs.commit != steps.latest_commit_and_tag.outputs.commit
+        working-directory: ./audiowaveform-docker
+        run: |
+          git config user.email "${{ secrets.USER_EMAIL }}"
+          git config user.name "${{ secrets.USER_NAME }}"
+          git add Dockerfile
+          git commit -m "update to ${{ steps.latest_commit_and_tag.outputs.commit }}"
+          git push
