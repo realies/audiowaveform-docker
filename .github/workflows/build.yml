@@ -4,6 +4,9 @@ on:
   schedule:
     - cron: '0 0 * * *' # Daily at 00:00 UTC
   workflow_dispatch:
+  push:
+    branches:
+      - master
 
 jobs:
   check-and-update:
@@ -80,7 +83,9 @@ jobs:
           TAG_NAME: ${{ steps.latest_commit_and_tag.outputs.tag }}
 
       - name: Build and push Docker image
-        if: steps.current_commit.outputs.commit != steps.latest_commit_and_tag.outputs.commit
+        if: |
+          steps.current_commit.outputs.commit != steps.latest_commit_and_tag.outputs.commit ||
+          (github.event_name == 'push' && !contains(github.event.head_commit.message, 'update to'))
         uses: docker/build-push-action@v5
         with:
           context: ./audiowaveform-docker

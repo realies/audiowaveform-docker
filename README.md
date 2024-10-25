@@ -1,9 +1,9 @@
 # Audio Waveform Image Generator Docker Container
 
-![GitHub Workflow Status](https://shields.api-test.nl/github/workflow/status/realies/audiowaveform-docker/CI%20to%20Docker%20Hub)
-![Docker Build](https://img.shields.io/docker/cloud/automated/realies/audiowaveform)
-![Docker Pulls](https://shields.api-test.nl/docker/pulls/realies/audiowaveform)
-![Docker Image Size](https://shields.api-test.nl/docker/image-size/realies/audiowaveform)
+![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/realies/audiowaveform-docker/build.yml)
+![Docker Build](https://img.shields.io/docker/automated/realies/audiowaveform)
+![Docker Pulls](https://img.shields.io/docker/pulls/realies/audiowaveform)
+![Docker Image Size](https://img.shields.io/docker/image-size/realies/audiowaveform)
 
 **audiowaveform** is a C++ command-line application that generates waveform data
 from either MP3, WAV, FLAC, Ogg Vorbis, or Opus format audio files. Waveform data can
