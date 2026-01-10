@@ -70,7 +70,7 @@ RUN apk add --no-cache alsa-lib-dev cmake git flac-dev libvorbis-dev linux-heade
 	CTEST_OUTPUT_ON_FAILURE=TRUE ctest -E write_read_test_sd2 && \
 	cd .. && \
 	cmake --install build
-RUN apk add --no-cache cmake g++ gcc git samurai zlib-dev && \
+RUN apk add --no-cache cmake g++ gcc git gperf samurai zlib-dev && \
 	git clone https://codeberg.org/tenacityteam/libid3tag && \
 	cd libid3tag && \
 	cmake -B build -G Ninja \
