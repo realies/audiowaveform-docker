@@ -1,5 +1,5 @@
 FROM alpine:edge as builder
-ENV COMMIT 9edb233
+ENV COMMIT 4682ffb
 RUN apk add --no-cache autoconf automake g++ gcc libtool make nasm ncurses-dev && \
 	wget https://downloads.sourceforge.net/project/lame/lame/3.100/lame-3.100.tar.gz && \
 	tar -xf lame-3.100.tar.gz && \
@@ -85,7 +85,7 @@ RUN apk add --no-cache cmake g++ gcc git gperf samurai zlib-dev && \
 	cd .. && \
 	cmake --install build
 RUN apk add --no-cache boost-dev boost-static cmake g++ gcc gd-dev git libgd libmad-dev libpng-dev libpng-static libvorbis-static make zlib-dev zlib-static && \
-	git clone -n https://github.com/bbc/audiowaveform.git && \
+	git clone -n https://codeberg.org/chrisn/audiowaveform.git && \
 	cd audiowaveform && \
 	git checkout ${COMMIT} && \
 	git clone https://github.com/google/googletest && \

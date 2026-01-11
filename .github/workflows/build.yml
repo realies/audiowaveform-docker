@@ -25,25 +25,20 @@ jobs:
 
       - name: Get latest commit and check for tag from audiowaveform
         id: latest_commit_and_tag
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const commitResult = await github.rest.repos.getBranch({
-              owner: 'bbc',
-              repo: 'audiowaveform',
-              branch: 'master',
-            });
-            const commit = commitResult.data.commit.sha.substring(0, 7);
-            console.log(`latest commit SHA: ${commit}`);
-            core.setOutput('commit', commit);
+        run: |
+          # Get latest commit from Codeberg
+          BRANCH_DATA=$(curl -s https://codeberg.org/api/v1/repos/chrisn/audiowaveform/branches/master)
+          FULL_SHA=$(echo "$BRANCH_DATA" | jq -r '.commit.id')
+          COMMIT="${FULL_SHA:0:7}"
+          echo "latest commit SHA: $COMMIT"
+          echo "commit=$COMMIT" >> $GITHUB_OUTPUT
 
-            const tagsResult = await github.rest.repos.listTags({
-              owner: 'bbc',
-              repo: 'audiowaveform',
-            });
-            const tag = tagsResult.data.find(t => t.commit.sha.startsWith(commit))?.name || '';
-            console.log(`tag associated with the latest commit: ${tag}`);
-            core.setOutput('tag', tag);
+          # Get tags and find one matching this commit
+          TAGS_DATA=$(curl -s https://codeberg.org/api/v1/repos/chrisn/audiowaveform/tags)
+          TAG=$(echo "$TAGS_DATA" | jq -r --arg sha "$FULL_SHA" '.[] | select(.commit.sha == $sha) | .name' | head -1)
+          TAG="${TAG:-}"
+          echo "tag associated with the latest commit: $TAG"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
 
       - name: Read current commit in Dockerfile
         id: current_commit
