@@ -9,8 +9,13 @@ on:
       - master
 
 jobs:
-  check-and-update:
+  check:
     runs-on: ubuntu-latest
+    outputs:
+      should_build: ${{ steps.check.outputs.should_build }}
+      commit: ${{ steps.latest_commit_and_tag.outputs.commit }}
+      tag: ${{ steps.latest_commit_and_tag.outputs.tag }}
+      tags: ${{ steps.prepare_tags.outputs.tags }}
     steps:
       - name: Checkout audiowaveform-docker repository
         uses: actions/checkout@v4
@@ -31,7 +36,7 @@ jobs:
             const commit = commitResult.data.commit.sha.substring(0, 7);
             console.log(`latest commit SHA: ${commit}`);
             core.setOutput('commit', commit);
-            
+
             const tagsResult = await github.rest.repos.listTags({
               owner: 'bbc',
               repo: 'audiowaveform',
@@ -48,6 +53,17 @@ jobs:
           echo "current COMMIT in Dockerfile: $COMMIT"
           echo "commit=$COMMIT" >> $GITHUB_OUTPUT
 
+      - name: Check if build is needed
+        id: check
+        run: |
+          if [[ "${{ steps.current_commit.outputs.commit }}" != "${{ steps.latest_commit_and_tag.outputs.commit }}" ]]; then
+            echo "should_build=true" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.event_name }}" == "push" && ! "${{ github.event.head_commit.message }}" =~ "update to" ]]; then
+            echo "should_build=true" >> $GITHUB_OUTPUT
+          else
+            echo "should_build=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Update Dockerfile if needed
         if: steps.current_commit.outputs.commit != steps.latest_commit_and_tag.outputs.commit
         working-directory: ./audiowaveform-docker
@@ -57,6 +73,48 @@ jobs:
         env:
           CURRENT_COMMIT: ${{ steps.current_commit.outputs.commit }}
           LATEST_COMMIT: ${{ steps.latest_commit_and_tag.outputs.commit }}
+
+      - name: Prepare Docker Tags
+        id: prepare_tags
+        run: |
+          if [[ ! -z "${{ steps.latest_commit_and_tag.outputs.tag }}" ]]; then
+            echo "tags=realies/audiowaveform:${{ steps.latest_commit_and_tag.outputs.tag }},realies/audiowaveform:latest" >> $GITHUB_OUTPUT
+          else
+            echo "tags=realies/audiowaveform:latest" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Upload Dockerfile
+        if: steps.check.outputs.should_build == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: dockerfile
+          path: audiowaveform-docker/Dockerfile
+
+  build:
+    needs: check
+    if: needs.check.outputs.should_build == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - linux/386
+          - linux/amd64
+          - linux/arm/v6
+          - linux/arm/v7
+          - linux/arm64/v8
+          - linux/ppc64le
+          - linux/s390x
+    steps:
+      - name: Checkout audiowaveform-docker repository
+        uses: actions/checkout@v4
+        with:
+          repository: 'realies/audiowaveform-docker'
+
+      - name: Download Dockerfile
+        uses: actions/download-artifact@v4
+        with:
+          name: dockerfile
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -70,39 +128,96 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Prepare Docker Tags
-        id: prepare_tags
-        working-directory: ./audiowaveform-docker
+      - name: Prepare platform tag
+        id: platform_tag
         run: |
-          if [[ ! -z "$TAG_NAME" ]]; then
-            echo "tags=realies/audiowaveform:$TAG_NAME,realies/audiowaveform:latest" >> $GITHUB_OUTPUT
-          else
-            echo "tags=realies/audiowaveform:latest" >> $GITHUB_OUTPUT
-          fi
-        env:
-          TAG_NAME: ${{ steps.latest_commit_and_tag.outputs.tag }}
+          PLATFORM="${{ matrix.platform }}"
+          TAG="${PLATFORM//\//-}"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
 
-      - name: Build and push Docker image
-        if: |
-          steps.current_commit.outputs.commit != steps.latest_commit_and_tag.outputs.commit ||
-          (github.event_name == 'push' && !contains(github.event.head_commit.message, 'update to'))
+      - name: Build and push by digest
+        id: build
         uses: docker/build-push-action@v5
         with:
-          context: ./audiowaveform-docker
-          file: ./audiowaveform-docker/Dockerfile
-          push: true
-          tags: ${{ steps.prepare_tags.outputs.tags }}
-          platforms: linux/386,linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64/v8,linux/ppc64le,linux/s390x
-          # Ensure Buildx is used with cache
-          cache-from: type=registry,ref=realies/audiowaveform:cache
-          cache-to: type=inline,mode=max,ref=realies/audiowaveform:cache
+          context: .
+          file: ./Dockerfile
+          platforms: ${{ matrix.platform }}
+          outputs: type=image,name=realies/audiowaveform,push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=registry,ref=realies/audiowaveform:cache-${{ steps.platform_tag.outputs.tag }}
+          cache-to: type=registry,ref=realies/audiowaveform:cache-${{ steps.platform_tag.outputs.tag }},mode=max
 
-      - name: Commit Dockerfile if needed
-        if: steps.current_commit.outputs.commit != steps.latest_commit_and_tag.outputs.commit
-        working-directory: ./audiowaveform-docker
+      - name: Export digest
         run: |
-          git config user.email "${{ secrets.USER_EMAIL }}"
-          git config user.name "${{ secrets.USER_NAME }}"
-          git add Dockerfile
-          git commit -m "update to ${{ steps.latest_commit_and_tag.outputs.commit }}"
-          git push
+          mkdir -p /tmp/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"
+
+      - name: Upload digest
+        uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ steps.platform_tag.outputs.tag }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  merge:
+    needs: [check, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download digests
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          pattern: digests-*
+          merge-multiple: true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Create manifest list and push
+        working-directory: /tmp/digests
+        run: |
+          TAGS="${{ needs.check.outputs.tags }}"
+          TAG_ARGS=""
+          IFS=',' read -ra TAG_ARRAY <<< "$TAGS"
+          for tag in "${TAG_ARRAY[@]}"; do
+            TAG_ARGS="$TAG_ARGS -t $tag"
+          done
+          docker buildx imagetools create $TAG_ARGS \
+            $(printf 'realies/audiowaveform@sha256:%s ' *)
+
+      - name: Inspect image
+        run: |
+          docker buildx imagetools inspect realies/audiowaveform:latest
+
+  commit:
+    needs: [check, merge]
+    if: needs.check.outputs.commit != ''
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout audiowaveform-docker repository
+        uses: actions/checkout@v4
+        with:
+          repository: 'realies/audiowaveform-docker'
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download Dockerfile
+        uses: actions/download-artifact@v4
+        with:
+          name: dockerfile
+
+      - name: Check for changes and commit
+        run: |
+          if ! git diff --quiet Dockerfile; then
+            git config user.email "${{ secrets.USER_EMAIL }}"
+            git config user.name "${{ secrets.USER_NAME }}"
+            git add Dockerfile
+            git commit -m "update to ${{ needs.check.outputs.commit }}"
+            git push
+          fi
