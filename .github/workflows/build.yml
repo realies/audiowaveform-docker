@@ -138,8 +138,6 @@ jobs:
           file: ./Dockerfile
           platforms: ${{ matrix.platform }}
           outputs: type=image,name=realies/audiowaveform,push-by-digest=true,name-canonical=true,push=true
-          cache-from: type=registry,ref=realies/audiowaveform:cache-${{ steps.platform_tag.outputs.tag }}
-          cache-to: type=registry,ref=realies/audiowaveform:cache-${{ steps.platform_tag.outputs.tag }},mode=max
 
       - name: Export digest
         run: |
