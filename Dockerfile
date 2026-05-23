@@ -44,7 +44,7 @@ RUN apk add --no-cache cmake g++ gcc git samurai && \
 	cmake --build build -j $(nproc) && \
 	ctest -j $(nproc) && \
 	cmake --install build
-RUN apk add --no-cache autoconf automake libtool g++ gcc gettext git !libiconv make pkgconfig && \
+RUN apk add --no-cache autoconf automake libtool g++ gcc gettext-dev git !libiconv make pkgconfig && \
 	git clone https://github.com/xiph/flac && \
 	cd flac && \
 	./autogen.sh && \
