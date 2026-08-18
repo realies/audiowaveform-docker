@@ -1,5 +1,5 @@
 FROM alpine:edge as builder
-ENV COMMIT cf8688e
+ENV COMMIT c043aed
 RUN apk add --no-cache autoconf automake g++ gcc libtool make nasm ncurses-dev && \
 	wget https://downloads.sourceforge.net/project/lame/lame/3.100/lame-3.100.tar.gz && \
 	tar -xf lame-3.100.tar.gz && \
